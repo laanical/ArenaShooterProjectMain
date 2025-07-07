@@ -8,7 +8,7 @@ public class RangedEnemyAI : MonoBehaviour
     public GameObject projectilePrefab;
     public Transform firePoint;
     [Tooltip("Set this to the layers you want to be considered obstacles (e.g., 'Default', 'Walls'). The player should NOT be on this layer.")]
-    public LayerMask obstacleLayers; // RENAMED for clarity
+    public LayerMask obstacleLayers;
     private Animator animator;
 
     [Header("AI Behavior")]
@@ -37,6 +37,14 @@ public class RangedEnemyAI : MonoBehaviour
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
         
+        // --- THE FIX ---
+        // Tell the NavMesh Agent that WE will handle the rotation.
+        // This stops it from turning the enemy around when retreating.
+        if (agent != null)
+        {
+            agent.updateRotation = false;
+        }
+        
         GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
         if (playerObject != null)
         {
@@ -45,20 +53,17 @@ public class RangedEnemyAI : MonoBehaviour
         }
         else
         {
-            // --- IMPROVEMENT 1: Better 'Player Not Found' Handling ---
             Debug.LogError("RangedEnemyAI: Could not find GameObject with tag 'Player'. Disabling AI.", this);
-            enabled = false; // Disable this script if the player doesn't exist.
+            enabled = false;
             return;
         }
 
-        // Safety checks
         if (agent == null) Debug.LogError("RangedEnemyAI: NavMeshAgent component not found.", this);
         if (animator == null) Debug.LogWarning("RangedEnemyAI: Animator component not found. Enemy will not be animated.", this);
     }
 
     void Update()
     {
-        // This check is still good practice, even with the Awake change.
         if (player == null || agent == null) return;
 
         float distanceToPlayer = Vector3.Distance(transform.position, player.position);
@@ -67,41 +72,40 @@ public class RangedEnemyAI : MonoBehaviour
         {
             agent.isStopped = true;
             UpdateAnimation(0);
+            return;
+        }
+
+        FacePlayer();
+
+        // MOVEMENT LOGIC
+        if (distanceToPlayer < retreatDistance)
+        {
+            Retreat();
+        }
+        else if (distanceToPlayer > optimalDistance)
+        {
+            Chase();
         }
         else
         {
-            FacePlayer();
-
-            if (distanceToPlayer < retreatDistance)
-            {
-                Retreat();
-            }
-            else if (distanceToPlayer > optimalDistance && distanceToPlayer < attackRange)
-            {
-                Chase();
-            }
-            else if (distanceToPlayer <= attackRange) // In shooting range, but not too close or too far
-            {
-                agent.isStopped = true;
-                if (Time.time >= timeUntilNextAttack && HasLineOfSight())
-                {
-                    Attack();
-                }
-            }
-            else // Outside attack range, but inside sight range
-            {
-                 Chase();
-            }
-            
-            UpdateAnimation(agent.velocity.magnitude);
+            agent.isStopped = true;
         }
+
+        // ATTACK LOGIC (INDEPENDENT OF MOVEMENT)
+        if (distanceToPlayer <= attackRange && Time.time >= timeUntilNextAttack && HasLineOfSight())
+        {
+            Attack();
+        }
+        
+        UpdateAnimation(agent.velocity.magnitude);
     }
 
     private void FacePlayer()
     {
         Vector3 direction = (player.position - transform.position).normalized;
         Quaternion lookRotation = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
-        transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+        // Use a slightly faster rotation speed to make sure it keeps up
+        transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 10f);
     }
 
     private void Retreat()
@@ -133,23 +137,20 @@ public class RangedEnemyAI : MonoBehaviour
 
     private bool HasLineOfSight()
     {
-        // --- IMPROVEMENT 2: More Robust Line of Sight ---
         if (playerCollider == null) return false;
         
         Vector3 targetPosition = playerCollider.bounds.center;
         Vector3 direction = (targetPosition - firePoint.position).normalized;
         float distance = Vector3.Distance(firePoint.position, targetPosition);
 
-        // If the raycast hits an object on an obstacle layer, our view is blocked.
         if (Physics.Raycast(firePoint.position, direction, distance, obstacleLayers))
         {
             Debug.DrawRay(firePoint.position, direction * distance, Color.red);
-            return false; // View is blocked
+            return false;
         }
 
-        // Otherwise, we have a clear shot.
         Debug.DrawRay(firePoint.position, direction * distance, Color.green);
-        return true; // View is clear
+        return true;
     }
 
     private void UpdateAnimation(float speed)

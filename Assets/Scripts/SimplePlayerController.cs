@@ -1,143 +1,179 @@
 using UnityEngine;
+using System.Collections; // Required for smooth crouching
 
-// A simple, from-scratch Rigidbody-based character controller.
-// This version is designed to work with default physics materials.
-// It handles ground movement, slope adaptation, jumping, and custom gravity.
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(CapsuleCollider))]
 public class SimplePlayerController : MonoBehaviour
 {
-    [Header("Movement")]
+    [Header("Movement Speeds")]
     public float moveSpeed = 6f;
+    [Tooltip("How much faster the player moves when sprinting. 1.5 = 50% faster.")]
+    public float sprintMultiplier = 1.5f;
+    [Tooltip("How much slower the player moves when crouching. 0.5 = 50% slower.")]
+    public float crouchMultiplier = 0.5f;
+
+    [Header("Jumping & Air Control")]
     public float jumpForce = 8f;
+    [Tooltip("How much control the player has over movement while airborne.")]
+    public float airControlFactor = 0.5f;
+
+    [Header("Crouching")]
+    public float standingHeight = 2.0f;
+    public float crouchingHeight = 1.0f;
+    public float crouchTransitionSpeed = 10f;
+    public Transform cameraTransform; // Assign your player camera transform here
 
     [Header("Gravity & Ground Check")]
-    public float gravity = -20f; // Custom gravity force.
+    public float gravity = -20f;
     public LayerMask groundLayer;
-    [Tooltip("The steepest slope the player can walk on, in degrees.")]
     public float maxSlopeAngle = 45f;
+    
+    [Header("Debugging")]
+    [Tooltip("Shows the current grounded state in the Inspector.")]
+    [SerializeField] private bool _isGrounded_DEBUG;
 
-    // --- Private Fields ---
+    // --- Private State Fields ---
     private Rigidbody rb;
     private CapsuleCollider playerCollider;
-    private Animator animator; // Added for animation support
-
+    private Vector3 originalCameraPosition;
     private bool isGrounded;
-    private Vector3 groundNormal; // The normal of the slope we're standing on.
-
-    // Animator parameter IDs for efficiency
-    private readonly int animIDSpeed = Animator.StringToHash("Speed");
-    private readonly int animIDGrounded = Animator.StringToHash("Grounded"); // Make sure this matches your Animator parameter
-    private readonly int animIDJump = Animator.StringToHash("Jump");
+    private Vector3 groundNormal;
+    private bool isCrouching = false;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
         playerCollider = GetComponent<CapsuleCollider>();
-        animator = GetComponent<Animator>(); // Get the animator component
         
-        // Let our script control all physics.
+        if (cameraTransform == null)
+        {
+            Debug.LogError("Player Camera Transform not assigned in the inspector!", this);
+            enabled = false;
+            return;
+        }
+        originalCameraPosition = cameraTransform.localPosition;
+
         rb.useGravity = false;
         rb.freezeRotation = true;
     }
 
     void Update()
     {
-        // Handle jump input in Update for responsiveness.
-        if (isGrounded && Input.GetButtonDown("Jump"))
-        {
-            Jump();
-        }
+        HandleInput();
+        HandleCrouch();
     }
 
     void FixedUpdate()
     {
-        // Perform all physics calculations in FixedUpdate.
         CheckIfGrounded();
         MovePlayer();
-        UpdateAnimator();
+    }
+
+    private void HandleInput()
+    {
+        if (isGrounded && Input.GetButtonDown("Jump"))
+        {
+            Jump();
+        }
+
+        if (Input.GetKeyDown(KeyCode.LeftControl))
+        {
+            isCrouching = !isCrouching;
+        }
     }
 
     private void MovePlayer()
     {
-        // 1. Get Input
+        float currentSpeed = moveSpeed;
+        if (isCrouching)
+        {
+            currentSpeed *= crouchMultiplier;
+        }
+        else if (Input.GetKey(KeyCode.LeftShift)) 
+        {
+            currentSpeed *= sprintMultiplier;
+        }
+
         float moveHorizontal = Input.GetAxis("Horizontal");
         float moveVertical = Input.GetAxis("Vertical");
         Vector3 inputDirection = (transform.forward * moveVertical + transform.right * moveHorizontal).normalized;
 
         if (isGrounded)
         {
-            // --- Grounded Movement Logic ---
-            Vector3 moveDirection = Vector3.ProjectOnPlane(inputDirection, groundNormal).normalized;
-            
-            if (inputDirection.sqrMagnitude > 0.01f)
-            {
-                rb.velocity = moveDirection * moveSpeed;
-            }
-            else 
-            {
-                rb.velocity = Vector3.zero;
-            }
-
-            // --- THE FIX for the "stair-top hop" ---
-            // If we are grounded but somehow moving upwards (e.g., from cresting a ramp),
-            // clamp the vertical velocity to zero. This prevents the hop.
-            if (rb.velocity.y > 0)
-            {
-                rb.velocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
-            }
+            Vector3 targetVelocity = Vector3.ProjectOnPlane(inputDirection, groundNormal) * currentSpeed;
+            rb.velocity = new Vector3(targetVelocity.x, rb.velocity.y, targetVelocity.z);
         }
         else
         {
-            // --- Airborne Movement Logic ---
-            Vector3 horizontalVelocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
-            float verticalVelocity = rb.velocity.y;
-
-            verticalVelocity += gravity * Time.fixedDeltaTime;
-            
-            rb.velocity = new Vector3(horizontalVelocity.x, verticalVelocity, horizontalVelocity.z);
+            Vector3 airForce = inputDirection * moveSpeed * airControlFactor;
+            rb.AddForce(airForce);
         }
+
+        rb.AddForce(Vector3.up * gravity, ForceMode.Acceleration);
     }
 
     private void Jump()
     {
-        // To get a consistent jump height, we first reset the vertical velocity before applying the jump force.
         rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
     }
 
+    // --- REVISED AND FIXED CROUCH HANDLING ---
+    private void HandleCrouch()
+    {
+        float targetHeight = isCrouching ? crouchingHeight : standingHeight;
+        
+        // --- THE FIX ---
+        // We must also adjust the collider's center point as its height changes.
+        // The center of a capsule is always at half its height.
+        Vector3 targetCenter = new Vector3(0, targetHeight / 2f, 0);
+
+        // Smoothly transition the collider's height AND center.
+        playerCollider.height = Mathf.Lerp(playerCollider.height, targetHeight, Time.deltaTime * crouchTransitionSpeed);
+        playerCollider.center = Vector3.Lerp(playerCollider.center, targetCenter, Time.deltaTime * crouchTransitionSpeed);
+
+        // Also adjust the camera position to match the crouch.
+        Vector3 targetCameraPos = isCrouching ? 
+            new Vector3(originalCameraPosition.x, originalCameraPosition.y - (standingHeight - crouchingHeight), originalCameraPosition.z) : 
+            originalCameraPosition;
+        cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, targetCameraPos, Time.deltaTime * crouchTransitionSpeed);
+    }
+
     private void CheckIfGrounded()
     {
-        Vector3 origin = transform.position + new Vector3(0, playerCollider.radius, 0);
-        float radius = playerCollider.radius * 0.95f;
-        
-        // --- THE FIX for the "downhill glide" ---
-        // Increase the maxDistance slightly to make the check more reliable when walking off edges.
-        float maxDistance = playerCollider.radius + 0.2f; 
+        Vector3 spherePosition = transform.position + playerCollider.center;
+        float sphereRadius = playerCollider.radius * 0.9f;
+        float checkDistance = (playerCollider.height / 2f) - playerCollider.radius + 0.1f;
 
         RaycastHit hit;
-        if (Physics.SphereCast(origin, radius, Vector3.down, out hit, maxDistance, groundLayer))
+        if (Physics.SphereCast(spherePosition, sphereRadius, Vector3.down, out hit, checkDistance, groundLayer))
         {
             float slopeAngle = Vector3.Angle(Vector3.up, hit.normal);
             if (slopeAngle <= maxSlopeAngle)
             {
                 isGrounded = true;
                 groundNormal = hit.normal;
+                _isGrounded_DEBUG = true;
                 return;
             }
         }
         
         isGrounded = false;
         groundNormal = Vector3.up;
+        _isGrounded_DEBUG = false;
     }
 
-    private void UpdateAnimator()
+    private void OnDrawGizmosSelected()
     {
-        if (animator == null) return;
-
-        float speed = new Vector3(rb.velocity.x, 0, rb.velocity.z).magnitude;
-        
-        animator.SetFloat(animIDSpeed, speed);
-        animator.SetBool(animIDGrounded, isGrounded);
+        if (playerCollider != null)
+        {
+            Gizmos.color = Color.green;
+            Vector3 spherePosition = transform.position + playerCollider.center;
+            float sphereRadius = playerCollider.radius * 0.9f;
+            float checkDistance = (playerCollider.height / 2f) - playerCollider.radius + 0.1f;
+            
+            Vector3 endPosition = spherePosition + (Vector3.down * checkDistance);
+            Gizmos.DrawWireSphere(endPosition, sphereRadius);
+        }
     }
 }
