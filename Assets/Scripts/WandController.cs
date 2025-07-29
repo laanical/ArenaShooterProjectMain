@@ -1,85 +1,135 @@
 using UnityEngine;
+using System; // Required for using Actions/Events
+using System.Collections.Generic; // Required for using Lists
 
-// This script handles the firing logic for a simple projectile-based weapon like a wand.
+// This helper class is used to organize spell data in the Inspector.
+// It's not a component, just a data container.
+[System.Serializable]
+public class Spell
+{
+    public string name;
+    public GameObject projectilePrefab;
+    // We can add more spell-specific data here later, like mana cost, cooldown, etc.
+}
+
+// This script handles firing and swapping between a list of available spells.
 public class WandController : MonoBehaviour
 {
-    [Header("Weapon Settings")]
-    [Tooltip("The projectile prefab to be fired.")]
-    public GameObject projectilePrefab;
-    [Tooltip("The point from which the projectile is fired (e.g., the tip of the wand).")]
-    public Transform projectileSpawnPoint;
-    [Tooltip("The number of shots the wand can fire per second. Higher is faster.")]
-    public float attackSpeed = 2f; // Changed from fireRate to attackSpeed
+    [Header("Spell Settings")]
+    [Tooltip("The list of spells this wand can use.")]
+    public List<Spell> spells = new List<Spell>();
+    
+    [Header("Weapon Stats")]
+    [Tooltip("The number of shots the wand can fire per second.")]
+    public float attackSpeed = 2f;
 
-    [Header("Aiming")]
+    [Header("Common References")]
+    [Tooltip("The point from which projectiles are fired.")]
+    public Transform projectileSpawnPoint;
     [Tooltip("The maximum distance the aiming ray will check for targets.")]
     public float maxShootingDistance = 100f;
 
-    // --- Private Fields ---
+    // --- Public Events ---
+    // This event will notify the UI when the spell has changed.
+    public static event Action<int> OnSpellChanged;
+
+    // --- Private State ---
     private Camera mainCamera;
     private float nextFireTime = 0f;
+    private int currentSpellIndex = 0;
 
     void Start()
     {
-        // Find and store a reference to the main camera for aiming calculations.
         mainCamera = Camera.main;
         if (mainCamera == null)
         {
-            Debug.LogError("WandController: Main Camera not found. Ensure your player camera is tagged 'MainCamera'.", this);
-            enabled = false; // Disable the script if no camera is found.
+            Debug.LogError("WandController: Main Camera not found.", this);
+            enabled = false;
         }
 
-        // Safety checks for required components.
-        if (projectilePrefab == null) Debug.LogError("WandController: Projectile Prefab not assigned.", this);
+        // Safety checks
+        if (spells.Count == 0) Debug.LogError("WandController: No spells assigned in the Inspector!", this);
         if (projectileSpawnPoint == null) Debug.LogError("WandController: Projectile Spawn Point not assigned.", this);
+    }
+
+    // This function is called by WeaponManager when this weapon is selected.
+    void OnEnable()
+    {
+        // When the wand becomes active, immediately notify the UI of the current spell.
+        OnSpellChanged?.Invoke(currentSpellIndex);
+    }
+
+    // This function is called by WeaponManager when this weapon is deselected.
+    void OnDisable()
+    {
+        // When the wand is put away, we can tell the UI to hide the spell bar.
+        // We pass -1 to indicate no spell is active.
+        OnSpellChanged?.Invoke(-1);
     }
 
     void Update()
     {
-        // Check for fire input
-        if (Input.GetMouseButtonDown(0))
+        // This script's Update only runs when the Wand GameObject is active.
+        HandleInput();
+    }
+
+    private void HandleInput()
+    {
+        // --- Spell Selection Input ---
+        if (Input.GetKeyDown(KeyCode.Alpha1)) SelectSpell(0);
+        if (Input.GetKeyDown(KeyCode.Alpha2)) SelectSpell(1);
+        // Add more here for Alpha3, Alpha4, etc. if you add more spells.
+
+        // --- Firing Input ---
+        if (Input.GetMouseButtonDown(0) && Time.time >= nextFireTime)
         {
-            // Check if the cooldown has passed.
-            if (Time.time >= nextFireTime)
+            if (attackSpeed > 0)
             {
-                // --- REVISED: Calculate cooldown based on attacks per second ---
-                // We check if attackSpeed is positive to avoid division by zero errors.
-                if (attackSpeed > 0)
-                {
-                    // Set the time for the next available shot. The delay is 1 / attacks per second.
-                    nextFireTime = Time.time + (1f / attackSpeed);
-                    Fire();
-                }
+                nextFireTime = Time.time + (1f / attackSpeed);
+                Fire();
             }
+        }
+    }
+
+    private void SelectSpell(int index)
+    {
+        // Check if the selected spell index is valid for our list of spells.
+        if (index >= 0 && index < spells.Count)
+        {
+            currentSpellIndex = index;
+            Debug.Log("Switched to spell: " + spells[currentSpellIndex].name);
+            
+            // Fire the event to notify the UI that the spell has changed.
+            OnSpellChanged?.Invoke(currentSpellIndex);
         }
     }
 
     private void Fire()
     {
-        if (projectilePrefab == null || projectileSpawnPoint == null || mainCamera == null) return;
+        // Check if we have any spells to begin with.
+        if (spells.Count == 0 || spells[currentSpellIndex].projectilePrefab == null)
+        {
+            Debug.LogError("No projectile prefab assigned for the current spell!");
+            return;
+        }
+
+        GameObject projectileToFire = spells[currentSpellIndex].projectilePrefab;
 
         // --- Aiming Logic ---
-        // 1. Create a ray from the center of the camera's viewport.
         Ray cameraRay = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
         Vector3 targetPoint;
 
-        // 2. Perform a raycast to see what the camera is looking at.
         if (Physics.Raycast(cameraRay, out RaycastHit hitInfo, maxShootingDistance))
         {
-            // If the ray hits something, the target is the exact point of impact.
             targetPoint = hitInfo.point;
         }
         else
         {
-            // If the ray hits nothing, the target is a point far in the distance.
             targetPoint = cameraRay.GetPoint(maxShootingDistance);
         }
 
         // --- Firing Logic ---
-        // 3. Calculate the direction from the wand's tip to the target point.
         Vector3 directionToTarget = (targetPoint - projectileSpawnPoint.position).normalized;
-
-        // 4. Instantiate the projectile at the spawn point, rotated to face the calculated direction.
-        Instantiate(projectilePrefab, projectileSpawnPoint.position, Quaternion.LookRotation(directionToTarget));
+        Instantiate(projectileToFire, projectileSpawnPoint.position, Quaternion.LookRotation(directionToTarget));
     }
 }

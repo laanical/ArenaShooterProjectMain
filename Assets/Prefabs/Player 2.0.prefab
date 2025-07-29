@@ -314,7 +314,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 582b9f994c17e3d4f848761d3d8d2bba, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 500
+  maxHealth: 5000
   currentHealth: 0
 --- !u!114 &3430754766748798588
 MonoBehaviour:
@@ -337,6 +337,7 @@ MonoBehaviour:
   standingHeight: 2
   crouchingHeight: 1
   crouchTransitionSpeed: 10
+  cameraTransform: {fileID: 0}
   dashForce: 30
   dashDuration: 0.4
   dashCooldown: 2
@@ -1216,7 +1217,6 @@ MonoBehaviour:
     m_Bits: 192
   collisionOffset: 0.6
   cameraRadius: 0.3
-  crouchTransitionSpeed: 10
 --- !u!114 &8123264886155454323
 MonoBehaviour:
   m_ObjectHideFlags: 0

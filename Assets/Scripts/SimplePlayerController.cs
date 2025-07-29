@@ -1,5 +1,6 @@
 using UnityEngine;
-using System.Collections; // Required for smooth crouching
+using System.Collections;
+using System; // Required for events
 
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(CapsuleCollider))]
@@ -7,173 +8,227 @@ public class SimplePlayerController : MonoBehaviour
 {
     [Header("Movement Speeds")]
     public float moveSpeed = 6f;
-    [Tooltip("How much faster the player moves when sprinting. 1.5 = 50% faster.")]
     public float sprintMultiplier = 1.5f;
-    [Tooltip("How much slower the player moves when crouching. 0.5 = 50% slower.")]
     public float crouchMultiplier = 0.5f;
 
-    [Header("Jumping & Air Control")]
+    [Header("Jumping & Gravity")]
     public float jumpForce = 8f;
-    [Tooltip("How much control the player has over movement while airborne.")]
-    public float airControlFactor = 0.5f;
+    [Tooltip("How many times the player can jump before needing to touch a surface.")]
+    public int maxAirJumps = 3;
+    public float gravity = -30f;
 
     [Header("Crouching")]
     public float standingHeight = 2.0f;
     public float crouchingHeight = 1.0f;
     public float crouchTransitionSpeed = 10f;
-    public Transform cameraTransform; // Assign your player camera transform here
 
-    [Header("Gravity & Ground Check")]
-    public float gravity = -20f;
-    public LayerMask groundLayer;
-    public float maxSlopeAngle = 45f;
-    
-    [Header("Debugging")]
-    [Tooltip("Shows the current grounded state in the Inspector.")]
-    [SerializeField] private bool _isGrounded_DEBUG;
+    [Header("Dashing")]
+    public float dashForce = 20f;
+    public float dashDuration = 0.2f;
+    public float dashCooldown = 2f;
+
+    [Header("Enemy Interaction")]
+    public LayerMask enemyLayer;
+    public float enemyCollisionSlowdown = 0.25f;
+    public float slowdownLingerDuration = 0.5f;
+    public float enemyContactRadius = 0.6f;
 
     // --- Private State Fields ---
     private Rigidbody rb;
     private CapsuleCollider playerCollider;
-    private Vector3 originalCameraPosition;
-    private bool isGrounded;
-    private Vector3 groundNormal;
     private bool isCrouching = false;
+    private int jumpsRemaining;
+    private bool isDashing = false;
+    private float dashCooldownTimer = 0f;
+    private float slowdownTimer = 0f;
+
+    // --- Public Properties for UI/Other Scripts ---
+    public bool IsCrouching => isCrouching;
+    public float DashCooldownTimer => dashCooldownTimer;
+    // NEW: Public properties for the jump UI
+    public int JumpsRemaining => jumpsRemaining;
+    public int MaxAirJumps => maxAirJumps;
+
+    // NEW: Event to notify UI when jumps change
+    public static event Action<int, int> OnJumpsChanged;
+
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
         playerCollider = GetComponent<CapsuleCollider>();
-        
-        if (cameraTransform == null)
-        {
-            Debug.LogError("Player Camera Transform not assigned in the inspector!", this);
-            enabled = false;
-            return;
-        }
-        originalCameraPosition = cameraTransform.localPosition;
-
+        jumpsRemaining = maxAirJumps;
         rb.useGravity = false;
         rb.freezeRotation = true;
+    }
+
+    void Start()
+    {
+        // Fire event on start to initialize UI
+        OnJumpsChanged?.Invoke(jumpsRemaining, maxAirJumps);
     }
 
     void Update()
     {
         HandleInput();
-        HandleCrouch();
+        HandleEnemyContact(); 
+
+        if (dashCooldownTimer > 0)
+        {
+            dashCooldownTimer -= Time.deltaTime;
+        }
+
+        if (slowdownTimer > 0)
+        {
+            slowdownTimer -= Time.deltaTime;
+        }
     }
 
     void FixedUpdate()
     {
-        CheckIfGrounded();
+        HandleCrouchCollider();
         MovePlayer();
     }
 
     private void HandleInput()
     {
-        if (isGrounded && Input.GetButtonDown("Jump"))
+        if (jumpsRemaining > 0 && Input.GetButtonDown("Jump"))
         {
             Jump();
         }
 
         if (Input.GetKeyDown(KeyCode.LeftControl))
         {
-            isCrouching = !isCrouching;
+            if (isCrouching)
+            {
+                if (!CheckForHeadObstruction())
+                {
+                    isCrouching = false;
+                }
+            }
+            else
+            {
+                isCrouching = true;
+            }
+        }
+
+        if (Input.GetKeyDown(KeyCode.Q) && !isDashing && dashCooldownTimer <= 0)
+        {
+            StartCoroutine(DashCoroutine());
         }
     }
 
     private void MovePlayer()
     {
-        float currentSpeed = moveSpeed;
+        rb.AddForce(Vector3.up * gravity, ForceMode.Acceleration);
+
+        if (isDashing) return;
+
+        float speedMultiplier = 1.0f;
         if (isCrouching)
         {
-            currentSpeed *= crouchMultiplier;
+            speedMultiplier = crouchMultiplier;
         }
-        else if (Input.GetKey(KeyCode.LeftShift)) 
+        else if (Input.GetKey(KeyCode.LeftShift))
         {
-            currentSpeed *= sprintMultiplier;
+            speedMultiplier = sprintMultiplier;
         }
+        
+        float currentSpeed = moveSpeed * speedMultiplier;
 
+        if (slowdownTimer > 0)
+        {
+            float decayProgress = slowdownTimer / slowdownLingerDuration;
+            float currentSlowdown = Mathf.Lerp(1f, enemyCollisionSlowdown, decayProgress);
+            currentSpeed *= currentSlowdown;
+        }
+        
         float moveHorizontal = Input.GetAxis("Horizontal");
         float moveVertical = Input.GetAxis("Vertical");
         Vector3 inputDirection = (transform.forward * moveVertical + transform.right * moveHorizontal).normalized;
+        
+        Vector3 targetVelocity = inputDirection * currentSpeed;
+        Vector3 velocityChange = (targetVelocity - new Vector3(rb.velocity.x, 0, rb.velocity.z));
+        
+        rb.AddForce(velocityChange, ForceMode.VelocityChange);
+    }
 
-        if (isGrounded)
+    private void HandleEnemyContact()
+    {
+        Vector3 checkCenter = transform.TransformPoint(playerCollider.center);
+        if (Physics.CheckSphere(checkCenter, enemyContactRadius, enemyLayer))
         {
-            Vector3 targetVelocity = Vector3.ProjectOnPlane(inputDirection, groundNormal) * currentSpeed;
-            rb.velocity = new Vector3(targetVelocity.x, rb.velocity.y, targetVelocity.z);
+            slowdownTimer = slowdownLingerDuration;
         }
-        else
+    }
+
+    private IEnumerator DashCoroutine()
+    {
+        isDashing = true;
+        dashCooldownTimer = dashCooldown;
+
+        float moveHorizontal = Input.GetAxisRaw("Horizontal");
+        float moveVertical = Input.GetAxisRaw("Vertical");
+        Vector3 dashDirection = (transform.forward * moveVertical + transform.right * moveHorizontal).normalized;
+
+        if (dashDirection == Vector3.zero)
         {
-            Vector3 airForce = inputDirection * moveSpeed * airControlFactor;
-            rb.AddForce(airForce);
+            dashDirection = transform.forward;
         }
 
-        rb.AddForce(Vector3.up * gravity, ForceMode.Acceleration);
+        rb.AddForce(dashDirection * dashForce, ForceMode.VelocityChange);
+
+        yield return new WaitForSeconds(dashDuration);
+
+        isDashing = false;
     }
 
     private void Jump()
     {
+        jumpsRemaining--;
         rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+        // Fire the event to update the UI
+        OnJumpsChanged?.Invoke(jumpsRemaining, maxAirJumps);
+    }
+    
+    // --- REVISED JUMP RESET LOGIC ---
+    private void OnCollisionEnter(Collision collision)
+    {
+        // If we have used any jumps, reset them upon touching any surface.
+        if (jumpsRemaining < maxAirJumps)
+        {
+            jumpsRemaining = maxAirJumps;
+            // Fire the event to update the UI
+            OnJumpsChanged?.Invoke(jumpsRemaining, maxAirJumps);
+        }
     }
 
-    // --- REVISED AND FIXED CROUCH HANDLING ---
-    private void HandleCrouch()
+    private void HandleCrouchCollider()
     {
         float targetHeight = isCrouching ? crouchingHeight : standingHeight;
-        
-        // --- THE FIX ---
-        // We must also adjust the collider's center point as its height changes.
-        // The center of a capsule is always at half its height.
         Vector3 targetCenter = new Vector3(0, targetHeight / 2f, 0);
 
-        // Smoothly transition the collider's height AND center.
-        playerCollider.height = Mathf.Lerp(playerCollider.height, targetHeight, Time.deltaTime * crouchTransitionSpeed);
-        playerCollider.center = Vector3.Lerp(playerCollider.center, targetCenter, Time.deltaTime * crouchTransitionSpeed);
-
-        // Also adjust the camera position to match the crouch.
-        Vector3 targetCameraPos = isCrouching ? 
-            new Vector3(originalCameraPosition.x, originalCameraPosition.y - (standingHeight - crouchingHeight), originalCameraPosition.z) : 
-            originalCameraPosition;
-        cameraTransform.localPosition = Vector3.Lerp(cameraTransform.localPosition, targetCameraPos, Time.deltaTime * crouchTransitionSpeed);
+        playerCollider.height = Mathf.Lerp(playerCollider.height, targetHeight, Time.fixedDeltaTime * crouchTransitionSpeed);
+        playerCollider.center = Vector3.Lerp(playerCollider.center, targetCenter, Time.fixedDeltaTime * crouchTransitionSpeed);
     }
 
-    private void CheckIfGrounded()
+    private bool CheckForHeadObstruction()
     {
-        Vector3 spherePosition = transform.position + playerCollider.center;
-        float sphereRadius = playerCollider.radius * 0.9f;
-        float checkDistance = (playerCollider.height / 2f) - playerCollider.radius + 0.1f;
-
-        RaycastHit hit;
-        if (Physics.SphereCast(spherePosition, sphereRadius, Vector3.down, out hit, checkDistance, groundLayer))
-        {
-            float slopeAngle = Vector3.Angle(Vector3.up, hit.normal);
-            if (slopeAngle <= maxSlopeAngle)
-            {
-                isGrounded = true;
-                groundNormal = hit.normal;
-                _isGrounded_DEBUG = true;
-                return;
-            }
-        }
+        float checkRadius = playerCollider.radius;
+        Vector3 point1 = transform.position + new Vector3(0, checkRadius, 0);
+        Vector3 point2 = transform.position + new Vector3(0, standingHeight - checkRadius, 0);
         
-        isGrounded = false;
-        groundNormal = Vector3.up;
-        _isGrounded_DEBUG = false;
+        return Physics.CheckCapsule(point1, point2, checkRadius, ~LayerMask.GetMask("Player"));
     }
 
     private void OnDrawGizmosSelected()
     {
+        Gizmos.color = Color.green;
         if (playerCollider != null)
         {
-            Gizmos.color = Color.green;
-            Vector3 spherePosition = transform.position + playerCollider.center;
-            float sphereRadius = playerCollider.radius * 0.9f;
-            float checkDistance = (playerCollider.height / 2f) - playerCollider.radius + 0.1f;
-            
-            Vector3 endPosition = spherePosition + (Vector3.down * checkDistance);
-            Gizmos.DrawWireSphere(endPosition, sphereRadius);
+            Vector3 gizmoCenter = transform.TransformPoint(playerCollider.center);
+            Gizmos.DrawWireSphere(gizmoCenter, enemyContactRadius);
         }
     }
 }

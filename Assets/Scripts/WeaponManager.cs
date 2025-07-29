@@ -19,19 +19,9 @@ public class WeaponManager : MonoBehaviour
     void Update()
     {
         // --- Weapon Swapping Input ---
+        // Number key inputs have been removed to prevent conflict with the WandController's spell swapping.
         
-        // Example using number keys (1, 2, 3, etc.)
-        if (Input.GetKeyDown(KeyCode.Alpha1))
-        {
-            SelectWeapon(0); // Select first weapon
-        }
-
-        if (Input.GetKeyDown(KeyCode.Alpha2))
-        {
-            SelectWeapon(1); // Select second weapon
-        }
-        
-        // Example using mouse scroll wheel
+        // Weapon swapping is now handled exclusively by the mouse scroll wheel.
         if (Input.GetAxis("Mouse ScrollWheel") > 0f) // Scroll up
         {
             SelectNextWeapon();

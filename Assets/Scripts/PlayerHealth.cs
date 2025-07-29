@@ -1,51 +1,57 @@
 using UnityEngine;
-// If you plan to use a UI to show health, you'll need this.
-// using UnityEngine.UI; 
-// To reload the scene on death, you need this.
-using UnityEngine.SceneManagement;
+using System; // Required for using Actions/Events
+using UnityEngine.SceneManagement; // Required for reloading the scene
 
-// Manages the player's health and handles what happens when the player dies.
+// Manages the player's health, handles taking damage, and notifies other scripts of changes.
 public class PlayerHealth : MonoBehaviour
 {
+    [Header("Health Settings")]
     public int maxHealth = 100;
-    public int currentHealth;
+    private int _currentHealth;
 
-    // Optional: A reference to a UI health bar or text.
-    // public Slider healthBar; 
+    // This static event broadcasts the current and max health whenever health changes.
+    // The UI script will listen for this broadcast.
+    public static event Action<int, int> OnHealthChanged;
 
-    // Called when the script instance is being loaded.
-    void Awake()
+    public int CurrentHealth
     {
-        currentHealth = maxHealth;
-        // if (healthBar != null) healthBar.value = currentHealth;
+        get { return _currentHealth; }
+        private set
+        {
+            _currentHealth = Mathf.Clamp(value, 0, maxHealth);
+
+            // When health is set, fire the event to notify any listeners (like the UI).
+            OnHealthChanged?.Invoke(_currentHealth, maxHealth);
+        }
     }
 
-    // A public method that can be called by other scripts (like projectiles) to deal damage.
+    void Awake()
+    {
+        // Set health to full on startup. Using the property ensures the event fires.
+        CurrentHealth = maxHealth;
+    }
+
     public void TakeDamage(int damageAmount)
     {
-        // Don't do anything if the player is already dead.
-        if (currentHealth <= 0) return;
+        CurrentHealth -= damageAmount;
+        Debug.Log($"Player took {damageAmount} damage. Current health: {CurrentHealth}/{maxHealth}");
 
-        currentHealth -= damageAmount;
-        Debug.Log($"Player took {damageAmount} damage. Current health: {currentHealth}/{maxHealth}");
-
-        // Update UI if you have one
-        // if (healthBar != null) healthBar.value = currentHealth;
-
-        if (currentHealth <= 0)
+        if (CurrentHealth <= 0)
         {
-            currentHealth = 0; // Ensure health doesn't go below zero.
             Die();
         }
+    }
+
+    public void Heal(int healAmount)
+    {
+        CurrentHealth += healAmount;
+        Debug.Log($"Player healed {healAmount}. Current health: {CurrentHealth}/{maxHealth}");
     }
 
     private void Die()
     {
         Debug.Log("Player has died!");
-        
-        // --- Game Over Logic ---
-        // For now, we will simply reload the current scene.
-        // You could also show a "Game Over" screen, etc.
+        // Reload the current scene as a simple game over mechanic.
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

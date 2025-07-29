@@ -29,11 +29,10 @@ public class SimpleMeleeController : MonoBehaviour
     // --- Private State ---
     private float cooldownTimer = 0f;
     private bool isAttacking = false;
-    private List<Collider> enemiesHitThisSwing; // Prevents hitting the same enemy multiple times in one swing.
+    private List<Collider> enemiesHitThisSwing;
 
     void Start()
     {
-        // Basic validation to make sure everything is assigned in the Inspector.
         if (weaponAnimator == null) Debug.LogError("Animator not assigned!", this);
         if (attackAnimation == null) Debug.LogError("Attack Animation not assigned!", this);
         if (attackPoint == null) Debug.LogError("Attack Point not assigned!", this);
@@ -43,13 +42,11 @@ public class SimpleMeleeController : MonoBehaviour
 
     void Update()
     {
-        // The cooldown timer counts down each frame.
         if (cooldownTimer > 0)
         {
             cooldownTimer -= Time.deltaTime;
         }
 
-        // Check for attack input.
         if (Input.GetMouseButtonDown(0) && !isAttacking && cooldownTimer <= 0)
         {
             Attack();
@@ -58,13 +55,9 @@ public class SimpleMeleeController : MonoBehaviour
 
     private void Attack()
     {
-        // 1. Set the attack lock to prevent spamming.
         isAttacking = true;
-
-        // 2. Set the cooldown based on our attack speed.
         cooldownTimer = 1f / attackSpeed;
-
-        // 3. Start the master coroutine that controls the entire attack sequence.
+        
         StartCoroutine(AttackSequence());
     }
 
@@ -75,8 +68,7 @@ public class SimpleMeleeController : MonoBehaviour
         weaponAnimator.Play(attackAnimation.name, 0, 0f);
 
         // --- Hurtbox Phase ---
-        // Wait a tiny fraction of a second for the animation to begin its swing.
-        yield return new WaitForSeconds(0.05f / attackSpeed); // Scale delay by speed
+        yield return new WaitForSeconds(0.05f / attackSpeed);
 
         enemiesHitThisSwing.Clear(); 
         float hurtboxActiveTime = (attackAnimation.length * 0.7f) / attackSpeed;
@@ -97,7 +89,7 @@ public class SimpleMeleeController : MonoBehaviour
         }
         
         // --- Return to Idle ---
-        // 4. The sequence is over. Explicitly tell the Animator to return to the Idle state.
+        // The sequence is over. Explicitly tell the Animator to return to the Idle state.
         weaponAnimator.Play(idleStateName);
         weaponAnimator.speed = 1f; // Reset animator speed to normal.
         isAttacking = false; // Unlock the attack.
@@ -111,12 +103,8 @@ public class SimpleMeleeController : MonoBehaviour
         {
             if (!enemiesHitThisSwing.Contains(enemy))
             {
-                // We no longer need the Debug.Log here since the EnemyHealth script has its own.
                 enemiesHitThisSwing.Add(enemy);
                 
-                // --- DAMAGE SYSTEM ACTIVATED ---
-                // Try to get the EnemyHealth component from the object we hit.
-                // If it exists, call its TakeDamage method.
                 if (enemy.TryGetComponent<EnemyHealth>(out EnemyHealth enemyHealth))
                 {
                     enemyHealth.TakeDamage(attackDamage);
