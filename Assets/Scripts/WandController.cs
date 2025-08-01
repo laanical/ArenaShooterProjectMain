@@ -1,42 +1,50 @@
 using UnityEngine;
-using System; // Required for using Actions/Events
-using System.Collections.Generic; // Required for using Lists
+using System;
+using System.Collections;
+using System.Collections.Generic;
 
-// This helper class is used to organize spell data in the Inspector.
-// It's not a component, just a data container.
+public enum SpellType
+{
+    Projectile,
+    Beam,
+    ChargedProjectile
+}
+
 [System.Serializable]
 public class Spell
 {
     public string name;
-    public GameObject projectilePrefab;
-    // We can add more spell-specific data here later, like mana cost, cooldown, etc.
+    public GameObject projectilePrefab; 
+    public SpellType type = SpellType.Projectile;
+    public float minChargeTime = 0.5f;
+    public float maxChargeTime = 2.0f;
 }
 
-// This script handles firing and swapping between a list of available spells.
+
 public class WandController : MonoBehaviour
 {
     [Header("Spell Settings")]
-    [Tooltip("The list of spells this wand can use.")]
     public List<Spell> spells = new List<Spell>();
     
     [Header("Weapon Stats")]
-    [Tooltip("The number of shots the wand can fire per second.")]
     public float attackSpeed = 2f;
 
     [Header("Common References")]
-    [Tooltip("The point from which projectiles are fired.")]
     public Transform projectileSpawnPoint;
-    [Tooltip("The maximum distance the aiming ray will check for targets.")]
     public float maxShootingDistance = 100f;
 
-    // --- Public Events ---
-    // This event will notify the UI when the spell has changed.
     public static event Action<int> OnSpellChanged;
 
-    // --- Private State ---
     private Camera mainCamera;
     private float nextFireTime = 0f;
     private int currentSpellIndex = 0;
+    private GameObject activeBeam = null;
+
+    private bool isCharging = false;
+    private float currentChargeTime = 0f;
+    private GameObject activeChargeObject = null;
+    private ChargeVFXController activeChargeController = null;
+    private PoisonBombProjectile activeProjectileController = null;
 
     void Start()
     {
@@ -46,79 +54,127 @@ public class WandController : MonoBehaviour
             Debug.LogError("WandController: Main Camera not found.", this);
             enabled = false;
         }
-
-        // Safety checks
-        if (spells.Count == 0) Debug.LogError("WandController: No spells assigned in the Inspector!", this);
-        if (projectileSpawnPoint == null) Debug.LogError("WandController: Projectile Spawn Point not assigned.", this);
     }
-
-    // This function is called by WeaponManager when this weapon is selected.
+    
     void OnEnable()
     {
-        // When the wand becomes active, immediately notify the UI of the current spell.
         OnSpellChanged?.Invoke(currentSpellIndex);
     }
-
-    // This function is called by WeaponManager when this weapon is deselected.
+    
     void OnDisable()
     {
-        // When the wand is put away, we can tell the UI to hide the spell bar.
-        // We pass -1 to indicate no spell is active.
+        if (activeBeam != null)
+        {
+            Destroy(activeBeam);
+        }
+        if (isCharging)
+        {
+            CancelCharge();
+        }
         OnSpellChanged?.Invoke(-1);
     }
 
     void Update()
     {
-        // This script's Update only runs when the Wand GameObject is active.
         HandleInput();
+
+        if (activeBeam != null)
+        {
+            activeBeam.transform.position = projectileSpawnPoint.position;
+        }
+
+        if (isCharging)
+        {
+            currentChargeTime += Time.deltaTime;
+
+            if (activeChargeController != null)
+            {
+                Spell currentSpell = spells[currentSpellIndex];
+                float chargeProgress = Mathf.Clamp01(currentChargeTime / currentSpell.maxChargeTime);
+                activeChargeController.UpdateChargeVisual(chargeProgress);
+            }
+        }
     }
 
     private void HandleInput()
     {
-        // --- Spell Selection Input ---
-        if (Input.GetKeyDown(KeyCode.Alpha1)) SelectSpell(0);
-        if (Input.GetKeyDown(KeyCode.Alpha2)) SelectSpell(1);
-        // Add more here for Alpha3, Alpha4, etc. if you add more spells.
-
-        // --- Firing Input ---
-        if (Input.GetMouseButtonDown(0) && Time.time >= nextFireTime)
+        for (int i = 0; i < 9; i++)
         {
-            if (attackSpeed > 0)
+            if (Input.GetKeyDown(KeyCode.Alpha1 + i))
             {
-                nextFireTime = Time.time + (1f / attackSpeed);
-                Fire();
+                SelectSpell(i);
+                break; 
             }
+        }
+        
+        if (spells.Count <= currentSpellIndex) return;
+        Spell currentSpell = spells[currentSpellIndex];
+
+        switch (currentSpell.type)
+        {
+            // --- [THE FIX] ---
+            // This logic was broken. It now correctly calls a dedicated
+            // method for simple, non-charged projectiles.
+            case SpellType.Projectile:
+                if (Input.GetMouseButtonDown(0) && Time.time >= nextFireTime)
+                {
+                    nextFireTime = Time.time + (1f / attackSpeed);
+                    FireSimpleProjectile(currentSpell);
+                }
+                break;
+
+            // This logic was also missing. It's been restored.
+            case SpellType.Beam:
+                if (Input.GetMouseButtonDown(0))
+                {
+                    if (activeBeam == null)
+                    {
+                        activeBeam = Instantiate(currentSpell.projectilePrefab, projectileSpawnPoint.position, projectileSpawnPoint.rotation);
+                    }
+                }
+                else if (Input.GetMouseButtonUp(0))
+                {
+                    if (activeBeam != null)
+                    {
+                        Destroy(activeBeam);
+                    }
+                }
+                break;
+            // --- [END FIX] ---
+
+            case SpellType.ChargedProjectile:
+                if (Input.GetMouseButtonDown(0) && !isCharging)
+                {
+                    StartCharge(currentSpell);
+                }
+                else if (Input.GetMouseButtonUp(0) && isCharging)
+                {
+                    ReleaseCharge(currentSpell);
+                }
+                break;
         }
     }
 
     private void SelectSpell(int index)
     {
-        // Check if the selected spell index is valid for our list of spells.
+        if (activeBeam != null) Destroy(activeBeam);
+        if (isCharging) CancelCharge();
+        
         if (index >= 0 && index < spells.Count)
         {
             currentSpellIndex = index;
-            Debug.Log("Switched to spell: " + spells[currentSpellIndex].name);
-            
-            // Fire the event to notify the UI that the spell has changed.
             OnSpellChanged?.Invoke(currentSpellIndex);
         }
     }
-
-    private void Fire()
+    
+    // --- [NEW] ---
+    // A dedicated method for simple, non-charged projectiles.
+    private void FireSimpleProjectile(Spell spellToFire)
     {
-        // Check if we have any spells to begin with.
-        if (spells.Count == 0 || spells[currentSpellIndex].projectilePrefab == null)
-        {
-            Debug.LogError("No projectile prefab assigned for the current spell!");
-            return;
-        }
-
-        GameObject projectileToFire = spells[currentSpellIndex].projectilePrefab;
-
-        // --- Aiming Logic ---
+        if (spellToFire.projectilePrefab == null) return;
+        
         Ray cameraRay = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
         Vector3 targetPoint;
-
         if (Physics.Raycast(cameraRay, out RaycastHit hitInfo, maxShootingDistance))
         {
             targetPoint = hitInfo.point;
@@ -128,8 +184,73 @@ public class WandController : MonoBehaviour
             targetPoint = cameraRay.GetPoint(maxShootingDistance);
         }
 
-        // --- Firing Logic ---
-        Vector3 directionToTarget = (targetPoint - projectileSpawnPoint.position).normalized;
-        Instantiate(projectileToFire, projectileSpawnPoint.position, Quaternion.LookRotation(directionToTarget));
+        Vector3 direction = (targetPoint - projectileSpawnPoint.position).normalized;
+        Instantiate(spellToFire.projectilePrefab, projectileSpawnPoint.position, Quaternion.LookRotation(direction));
+    }
+    // --- [END NEW] ---
+
+    private void StartCharge(Spell spell)
+    {
+        isCharging = true;
+        currentChargeTime = 0f;
+
+        activeChargeObject = Instantiate(spell.projectilePrefab, projectileSpawnPoint.position, projectileSpawnPoint.rotation, projectileSpawnPoint);
+        
+        activeChargeController = activeChargeObject.GetComponent<ChargeVFXController>();
+        activeProjectileController = activeChargeObject.GetComponent<PoisonBombProjectile>();
+
+        if (activeChargeObject.TryGetComponent<Rigidbody>(out var rb))
+        {
+            rb.isKinematic = true;
+            rb.useGravity = false;
+        }
+
+        if (activeChargeController != null)
+        {
+            activeChargeController.UpdateChargeVisual(0f);
+        }
+    }
+
+    private void ReleaseCharge(Spell spell)
+    {
+        if (currentChargeTime >= spell.minChargeTime)
+        {
+            float chargePower = Mathf.Clamp01(currentChargeTime / spell.maxChargeTime);
+            
+            if (activeProjectileController != null)
+            {
+                activeChargeObject.transform.SetParent(null);
+
+                if (activeChargeController != null)
+                {
+                    activeChargeController.enabled = false;
+                }
+
+                activeProjectileController.Initialize(chargePower);
+            }
+        }
+        else
+        {
+            Debug.Log("Charge released too early. Fizzled.");
+            Destroy(activeChargeObject);
+        }
+        
+        isCharging = false;
+        activeChargeObject = null;
+        activeChargeController = null;
+        activeProjectileController = null;
+    }
+
+    private void CancelCharge()
+    {
+        isCharging = false;
+        currentChargeTime = 0f;
+        if (activeChargeObject != null)
+        {
+            Destroy(activeChargeObject);
+        }
+        activeChargeObject = null;
+        activeChargeController = null;
+        activeProjectileController = null;
     }
 }
