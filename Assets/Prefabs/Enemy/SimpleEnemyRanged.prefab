@@ -264,6 +264,7 @@ GameObject:
   - component: {fileID: 4762074387453848706}
   - component: {fileID: 1963098095828554122}
   - component: {fileID: 135307858643099526}
+  - component: {fileID: 3692786118727919211}
   - component: {fileID: -7474952639894472183}
   - component: {fileID: 6852582938031680567}
   m_Layer: 7
@@ -428,6 +429,25 @@ MonoBehaviour:
   maxHealth: 1
   currentHealth: 0
   healthTextDisplay: {fileID: 2381479204082057428}
+--- !u!114 &3692786118727919211
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6154140262284075760}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cbf3733e2522aa24fb8329b71ade05af, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  currentChill: 0
+  freezeThreshold: 100
+  freezeDuration: 3
+  postFreezeChillAmount: 25
+  originalMaterial: {fileID: 0}
+  frozenMaterial: {fileID: 0}
+  characterRenderer: {fileID: 0}
 --- !u!195 &-7474952639894472183
 NavMeshAgent:
   m_ObjectHideFlags: 0
