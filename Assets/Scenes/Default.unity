@@ -1012,6 +1012,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: SimpleEnemyRanged
       objectReference: {fileID: 0}
+    - target: {fileID: 6154140262284075760, guid: f214c2bb6b497a744a21e1e9351be529,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7971325933450814814, guid: f214c2bb6b497a744a21e1e9351be529,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -12636,6 +12641,11 @@ PrefabInstance:
       propertyPath: m_Name
       value: SimpleEnemy
       objectReference: {fileID: 0}
+    - target: {fileID: 6154140262284075760, guid: 03e8496869f2aed4cb0bb995fe51c22e,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7971325933450814814, guid: 03e8496869f2aed4cb0bb995fe51c22e,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -18766,7 +18776,7 @@ MonoBehaviour:
   - {fileID: 1329859916}
   - {fileID: 1997054861}
   - {fileID: 1952751314}
-  spawnInterval: 1
+  spawnInterval: 999999
   maxEnemies: 28
 --- !u!4 &1548957066
 Transform:
@@ -21639,6 +21649,79 @@ Mesh:
     offset: 0
     size: 0
     path: 
+--- !u!1001 &6931887190574839786
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 3084114968798239128, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: damage
+      value: 25
+      objectReference: {fileID: 0}
+    - target: {fileID: 6424669379188066922, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -94.98
+      objectReference: {fileID: 0}
+    - target: {fileID: 6424669379188066922, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 5.19
+      objectReference: {fileID: 0}
+    - target: {fileID: 6424669379188066922, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -130.28043
+      objectReference: {fileID: 0}
+    - target: {fileID: 6424669379188066922, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: m_LocalRotation.w
+      value: -0.0866135
+      objectReference: {fileID: 0}
+    - target: {fileID: 6424669379188066922, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6424669379188066922, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.99624205
+      objectReference: {fileID: 0}
+    - target: {fileID: 6424669379188066922, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6424669379188066922, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6424669379188066922, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 189.938
+      objectReference: {fileID: 0}
+    - target: {fileID: 6424669379188066922, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8243886962251354658, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02,
+        type: 3}
+      propertyPath: m_Name
+      value: SlimeEnemyLeaper
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 2a60cb7b99a3fc9459402ecd3f5b3e02, type: 3}
 --- !u!1001 &8055718013493118488
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -21913,7 +21996,8 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 2234818084462115022, guid: e3b4c0bda8e5c1f459e31c1d6ce3a696, type: 3}
     m_RemovedGameObjects:
     - {fileID: 4659470324556873231, guid: e3b4c0bda8e5c1f459e31c1d6ce3a696, type: 3}
     m_AddedGameObjects:
@@ -21938,3 +22022,4 @@ SceneRoots:
   - {fileID: 8055718013493118488}
   - {fileID: 848730145}
   - {fileID: 161005766}
+  - {fileID: 6931887190574839786}

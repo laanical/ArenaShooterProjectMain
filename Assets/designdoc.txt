@@ -1,108 +1,116 @@
-Arena Shooter Roguelite — Design Document
-Project Lead: Laani
-Setting: Fantasy, first-person shooter
-Platform: PC (mouse + keyboard)
-Visuals: Currently graybox, simple Unity VFX. Style to be determined.
+Wizard Tower Arena Roguelite – Design Document (2024 Draft)
+Game Premise
+The player ascends a legendary wizard’s tower, battling hordes of magical enemies in ever-shifting arenas. Each floor of the tower is unique, themed around different branches of arcane knowledge or failed experiments. Combat is entirely spell-based: no swords, no axes, no arrows—just pure spell-slinging chaos.
 
-Core Gameplay
-Player is a first-person spellcaster, fighting waves of enemies in an arena.
-No visible player character (just a visible wand/staff in view).
-Movement is fast and vertical:
-3 jumps (rechargeable by touching any surface, including walls/ceilings).
-1 dash (meter under crosshair).
-Goal: Player can “bounce” through arenas, rarely touching the floor if skilled.
-Combat:
-Spells are the primary weapons (see “Spells”).
-Aiming is always towards a fixed crosshair at the center.
-Enemies come in waves, attack with melee or ranged, and will eventually have complex patterns including flight and vertical pursuit.
-Bosses will be important.
-Controls & Camera
-Mouse + Keyboard only.
-First-person view only.
-Camera never leaves player POV (no death cams, no cutscene zooms, etc.).
-Spell switching: Number keys 1–9 for now, likely to be replaced with scroll wheel.
-Firing:
-Click to fire, hold to charge, and hold for “laser/beam” types.
-Spells
-5 spells currently (one starter + 4 others); more planned.
-Spells are all ScriptableObjects for modularity.
-Editable in the Unity Editor, not hardcoded in scripts.
-Each spell can have unique firing mechanics (homing, chaining, area effects, piercing, etc.).
-Current examples: chain lightning, poison AOE, piercing laser, shotgun ice with slow/freeze, homing starter.
-No ammo or mana system yet (may be added later).
-Expectation: All spells will have unique/wacky behaviors—don’t add “basic” for the sake of filler.
-Upgrades / Roguelite Elements
-Upgrades are a core loop:
-Given as choices (likely “choose 1 of 3” on level/round up or after boss, etc.).
-Upgrades modify spells (e.g., split shot, increased homing, status effects on hit) or add abilities.
-Upgrades are per-run; persistency between runs is TBD and depends on future scope.
-Unlockable spells and upgrades possible, alternate characters not planned.
-No meta-progression systems or save system yet (planned later).
-Enemies
-Current: Placeholders, basic AI, chase and shoot.
-Planned:
-Enemies will use NavMesh for navigation, but need to be able to pursue the player vertically—no “safe” air camping.
-Abilities: melee, ranged, flying, jumping, etc.
-Bosses and mini-bosses will be key.
-Wave system:
-Triggered by kills or timers (TBD).
-Room/arena-based progression, no huge persistent world.
-Levels & Progression
-Arena-based:
-Instanced rooms/arenas, not open world or giant maps.
-Small enough that a minimap isn’t needed.
-Level design is focused on verticality, platforming, and skillful movement.
-“Theme” levels (e.g., fire, ice) planned.
-Random generation is a maybe; multiple hand-crafted levels more likely at first.
-Transition:
-No meta-hub or in-between area yet.
-Possible future hub or between-level upgrade/shop moments.
-UI/UX
-HUD Elements:
-Crosshair always visible.
-HP bar.
-Dash and jump meter below crosshair.
-Spell/action bar for currently equipped spells.
-Menus:
-All handled via Unity Canvas and in-world menu UI.
-No camera transitions for menus—strictly UI overlay.
-Debugging:
-Scripts should include clear comments and plenty of debug logs for troubleshooting.
-Art & Audio
-Art:
-Grayboxing phase, no finished style yet.
-VFX are Unity-made, simple, and functional.
-Style will be kept simple for scope and readability.
+Core Gameplay Loop
+Enter Arena:
+Player steps into a themed battle arena (single room per floor).
+
+Face Waves:
+Survive waves of increasingly difficult enemies (aim: 8 waves per floor), with enemy composition, AI, and hazards growing more complex over time.
+
+Boss Showdown:
+Defeat a boss unique to the current floor theme. Bosses summon support enemies (“adds”) and use signature magical attacks.
+
+Shop Interludes:
+Between sets of waves and after boss fights, players visit a magical shop to purchase new spells, upgrades, healing, or utility items.
+
+Ascend:
+Portal appears—player moves to the next floor (new arena + new theme). Order of floors is randomized every run; arenas within themes are also randomized.
+
+Victory or Defeat:
+Climb continues until death or final victory.
+
+Tower Floor Structure
+Themes:
+5–6 unique tower themes (example: Alchemy, Inferno, Library, Time, etc. — final themes TBD and flexible).
+
+Arena Variations:
+Each theme contains 2–3 distinct, hand-crafted arena layouts (roughly 10–18 rooms total).
+
+Single-Room Focus:
+Each level is one focused, highly-polished battle arena, dressed to fit the current theme. No multi-room dungeons or labyrinths.
+
+Props & Hazards:
+Arenas feature modular props and hazards (e.g. caustic pools, burning braziers, magic runes, shifting bookshelves) themed per floor. Some hazards may randomize activation/location per run.
+
+Boss/Shop Rooms:
+Unique layouts for boss battles and shops, styled per theme.
+
+Combat and Player Abilities
+No Melee:
+The player only uses magic spells, each with upgrade paths. All attacks are ranged/area or employ “spell tech.”
+
+Movement:
+Fast, skill-based: sprint, dash, multi-jump. Fluid arena navigation is required to survive.
+
+Upgradeable Spells:
+Spells are modular, unlockable, and can be enhanced between waves in the shop. Some spells may be acquired during the run as random rewards.
+
+Roguelite Progression:
+Spell upgrades, shop items, and run modifiers are random each session (“choose 1 of 3” upgrade, random shop inventory, etc.). Core meta-progression outside runs is minimal or TBD.
+
+Waves & Enemy Design
+Each floor’s progression:
+
+8 main waves increasing in difficulty (enemy number, tactics, synergies, occasional “elite” variants).
+Final wave = unique boss fight (with themed adds and environmental hazards).
+Enemy Variety:
+Distinct enemy archetypes per theme and across themes. All are “magical in nature” (constructs, homunculi, elementals, rival mages, failed experiments, magical fauna…).
+
+Status Effects:
+Enemies and player both interact with advanced combat effects (freeze, burn, poison, slow, mana drain, etc.), clearly indicated visually and audibly.
+
+Shops and Rewards
+Between Waves:
+Shops appear to break up the action, allowing players to spend acquired resources (gold, mana, arcane shards—final currency TBD) to purchase:
+
+New spells/unlocks
+Upgrades for current spells (“mods,” mutators, damage, cooldown)
+Healing
+Utility items (stat boosts, temporary buffs, escape tools, etc.)
+Shopkeeper:
+Themed/whimsical (e.g. wizard merchant, talking spellbook, magical vending machine). Appearance and UI styled to match current floor.
+
+Replayability & Randomization
+Floor Themes and Order:
+Order of tower floors/themes is randomized each run.
+
+Arenas Per Theme:
+Each run picks from 2–3 arena variants per theme, also randomized.
+
+Enemy Waves:
+Each wave features random spawns and compositions pulled from a weighted pool.
+
+Hazards/Props:
+Certain obstacles/hazards may activate/shuffle between runs to keep rooms feeling fresh.
+
+Boss Variants:
+Possible boss variation or “elite” bosses for advanced runs or challenges.
+
+Art, Audio, and UX
+Visuals:
+Strong theming per floor. Vibrant effects, clear readability for spells/status effects. Preference for readability over photorealism.
+
 Audio:
-Not mentioned yet. (Add SFX/music later.)
-Physics & Tech
-Physics:
-Used where needed (projectiles, movement, etc.).
-No commitment to full rigidbody-based gameplay.
-Input:
-Check SimplePlayerController.cs for current setup.
-Input system type not specified; check scripts for which system is in use (legacy vs new).
-To Be Decided / Next Steps
-Enemy AI improvements:
-Vertical pathfinding and smarter behaviors.
-Roguelite meta-progression:
-To be designed after core gameplay is solid.
-Save system:
-To be implemented when there’s actually stuff to save.
-Level generation vs hand-crafted:
-Still open; depends on dev time and design needs.
-Art style:
-Still under consideration.
-Miscellaneous
-No visible player character body or hands, just weapon.
-No plans for co-op, multiplayer, or alternate characters.
-No need for minimap or complex navigation aids.
-No hard “do nots” except: keep code modular, editable, and well-commented.
-Script References / Notes
-SimplePlayerController.cs — main reference for input, movement, and control setup.
-Spells are ScriptableObjects.
-Upgrades and spell effects are modular and should be extensible.
-Debugging is a priority: prefer more logs and comments, especially for new/complex systems.
-Final Note
-The goal is a fun, vertical, “bounce around and zap stuff” fantasy FPS with wild spell synergies and roguelite upgrades.
-Everything else is secondary.
+Dynamic soundscape, responsive magical effects, theme-appropriate music for each floor, boss, and shop.
+
+Controls:
+PC-focused (mouse + keyboard), responsive first-person movement. UI is clean—HUD, spell bar, wave/boss/shop screens only.
+
+Scope, Modularity, and Project Philosophy
+Lean and Modular:
+Design focuses on scope control. All arenas, shops, hazards, and enemies are modular/prefab-driven for easy future expansion or remixing.
+
+Expand Later, Polish Now:
+Release targets fun core gameplay, polishing a small number of highly distinct themes/levels. More content/complexity can come post-release.
+
+Player Experience First:
+Prioritize speed, clarity, and fun over raw content mass or feature bloat.
+
+Extra Features/Future Candidates
+Daily/Weekly Challenges
+Meta-progression unlocks (cosmetics, new spells)
+Special event floors or mutators
+Secret rooms, hidden interactions, or rare elite enemies
+Document Version: [2024-08-07 Draft]

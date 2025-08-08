@@ -47,6 +47,9 @@ public class IceShardProjectile : MonoBehaviour
 
     private Rigidbody rb;
 
+    // Debugging vars
+    private float spawnTime;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
@@ -56,7 +59,11 @@ public class IceShardProjectile : MonoBehaviour
 
     void Start()
     {
+        spawnTime = Time.time;
+        //Debug.Log($"[ICE SHARD SPAWNED] {name} at {transform.position} | Layer: {gameObject.layer} | Time: {spawnTime}", this);
+
         rb.velocity = transform.forward * speed;
+        // Random rotation on spawn (as before)
         transform.rotation = Quaternion.Euler(
             UnityEngine.Random.Range(0f, 360f),
             UnityEngine.Random.Range(0f, 360f),
@@ -67,8 +74,17 @@ public class IceShardProjectile : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
+        // Add a small grace period after spawn, in case of physics weirdness
+        if (Time.time - spawnTime < 0.03f) {
+            //Debug.Log($"[ICE SHARD IGNORED COLLISION] {name} with {other.name} ({other.gameObject.layer}) due to grace period", this);
+            return;
+        }
+
+        //Debug.Log($"[ICE SHARD COLLISION] {name} ({gameObject.layer}) hit {other.name} ({other.gameObject.layer}) at {transform.position} | Time: {Time.time}", this);
+
         if (other.gameObject.layer == this.gameObject.layer)
         {
+            //Debug.Log($"[ICE SHARD SELF-LAYER] {name} collided with another projectile, ignoring.", this);
             return;
         }
 
@@ -76,6 +92,7 @@ public class IceShardProjectile : MonoBehaviour
 
         if (enemyStatus != null)
         {
+            //Debug.Log($"[ICE SHARD HIT ENEMY] {name} hit {other.name}, applying chill/damage.", this);
             enemyStatus.ApplyChill(chillAmount);
             if(other.TryGetComponent<EnemyHealth>(out EnemyHealth enemyHealth))
             {
@@ -84,6 +101,7 @@ public class IceShardProjectile : MonoBehaviour
         }
         else if (((1 << other.gameObject.layer) & environmentLayers) != 0)
         {
+            //Debug.Log($"[ICE SHARD HIT ENVIRONMENT] {name} hit {other.name} (layer {other.gameObject.layer}).", this);
             Vector3 spawnPoint = transform.position;
 
             // --- Spawn the Hanging Ice Wall (Existing Logic) ---
@@ -101,23 +119,17 @@ public class IceShardProjectile : MonoBehaviour
             {
                 for (int i = 0; i < groundShardCount; i++)
                 {
-                    // Get a random point in a circle around the impact point.
                     Vector2 randomCircle = Random.insideUnitCircle * groundShardSpreadRadius;
                     Vector3 randomSpawnPoint = spawnPoint + new Vector3(randomCircle.x, 0, randomCircle.y);
 
-                    // Raycast down from this random point to find the actual ground position.
                     RaycastHit groundHit;
                     if (Physics.Raycast(randomSpawnPoint + Vector3.up * 2f, Vector3.down, out groundHit, 4f, environmentLayers))
                     {
-                        // --- [THE FIX] ---
-                        // Instead of aligning to the ground, give each shard a completely random 3D rotation.
                         Quaternion randomRotation = Quaternion.Euler(
                             Random.Range(0f, 360f),
                             Random.Range(0f, 360f),
                             Random.Range(0f, 360f)
                         );
-
-                        // Spawn the shard at the ground point with the new random rotation.
                         GameObject shard = Instantiate(groundShardPrefab, groundHit.point, randomRotation);
                         shard.transform.localScale = Vector3.one * groundShardScale;
                     }
@@ -130,6 +142,7 @@ public class IceShardProjectile : MonoBehaviour
             Instantiate(impactVFXPrefab, transform.position, Quaternion.identity);
         }
 
+        //Debug.Log($"[ICE SHARD DESTROYED] {name} at {transform.position} | Time: {Time.time}", this);
         Destroy(gameObject);
     }
 }

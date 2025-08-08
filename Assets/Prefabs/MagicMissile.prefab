@@ -126,6 +126,7 @@ MonoBehaviour:
   squiggleFrequency: 0.2
   lateralChaos: 2
   chaosChangeInterval: 2
+  gracePeriod: 0.3
   enableHoming: 1
   homingTurnSpeed: 5
   homingRange: 15
